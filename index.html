@@ -202,7 +202,7 @@
 </head>
 <body>
     <div class="calculator" id="calculator">
-        <div class="instructions">💡 Digite 1234= para chat secreto</div>
+        <div class="instructions">💡 Digite 1234 e toque em = para o chat secreto</div>
         <div class="display">
             <input type="text" id="display" readonly placeholder="0">
         </div>
@@ -240,7 +240,7 @@
         </div>
         <div class="chat-messages" id="chatMessages"></div>
         <div class="chat-input-area">
-            <input type="text" class="chat-input" id="messageInput" placeholder="Digite sua mensagem..." onkeypress="handleKeyPress(event)">
+            <input type="text" class="chat-input" id="messageInput" placeholder="Digite sua mensagem..." maxlength="500" onkeypress="handleKeyPress(event)">
             <button class="send-btn" onclick="sendMessage()">Enviar</button>
         </div>
     </div>
@@ -263,14 +263,11 @@
         let displayValue = '';
         const SECRET_CODE = '1234';
         let currentUser = localStorage.getItem('chat_username') || '';
+        let messagesListener = null;
 
         function appendToDisplay(value) {
             displayValue += value;
             document.getElementById('display').value = displayValue;
-            if (displayValue.includes(SECRET_CODE + '=')) {
-                openSecretChat();
-                clearDisplay();
-            }
         }
 
         function clearDisplay() {
@@ -284,14 +281,63 @@
         }
 
         function calculate() {
+            if (displayValue === SECRET_CODE) {
+                clearDisplay();
+                openSecretChat();
+                return;
+            }
             try {
-                const result = eval(displayValue);
-                displayValue = result.toString();
+                const result = evaluateExpression(displayValue);
+                if (!isFinite(result)) throw new Error('Resultado invalido');
+                displayValue = String(Math.round(result * 1e10) / 1e10);
                 document.getElementById('display').value = displayValue;
             } catch (error) {
                 document.getElementById('display').value = 'Erro';
                 setTimeout(clearDisplay, 1000);
             }
+        }
+
+        function evaluateExpression(expression) {
+            const tokens = expression.match(/\d+(?:\.\d+)?|\.\d+|[+\-*/]/g);
+            if (!tokens || tokens.join('') !== expression.replace(/\s+/g, '')) {
+                throw new Error('Expressao invalida');
+            }
+            const values = [];
+            const operators = [];
+            let expectNumber = true;
+            for (const token of tokens) {
+                if (/^[\d.]/.test(token)) {
+                    if (!expectNumber) throw new Error('Expressao invalida');
+                    values.push(parseFloat(token));
+                    expectNumber = false;
+                } else {
+                    if (expectNumber) {
+                        if (token !== '-' || values.length) throw new Error('Expressao invalida');
+                        values.push(0);
+                    }
+                    while (operators.length && precedence(operators[operators.length - 1]) >= precedence(token)) {
+                        applyOperator(values, operators.pop());
+                    }
+                    operators.push(token);
+                    expectNumber = true;
+                }
+            }
+            if (expectNumber) throw new Error('Expressao invalida');
+            while (operators.length) applyOperator(values, operators.pop());
+            return values[0];
+        }
+
+        function precedence(operator) {
+            return operator === '*' || operator === '/' ? 2 : 1;
+        }
+
+        function applyOperator(values, operator) {
+            const right = values.pop();
+            const left = values.pop();
+            if (operator === '+') values.push(left + right);
+            else if (operator === '-') values.push(left - right);
+            else if (operator === '*') values.push(left * right);
+            else values.push(left / right);
         }
 
         function openSecretChat() {
@@ -301,12 +347,20 @@
                 document.getElementById('userSetup').classList.add('hidden');
                 loadMessages();
             }
+            updateChatInputState();
         }
 
         function backToCalculator() {
+            stopListeningMessages();
             document.getElementById('secretChat').style.display = 'none';
             document.getElementById('calculator').classList.remove('hidden');
             clearDisplay();
+        }
+
+        function updateChatInputState() {
+            const hasUser = Boolean(currentUser);
+            document.getElementById('messageInput').disabled = !hasUser;
+            document.querySelector('.send-btn').disabled = !hasUser;
         }
 
         function setUsername() {
@@ -315,7 +369,9 @@
                 currentUser = username;
                 localStorage.setItem('chat_username', username);
                 document.getElementById('userSetup').classList.add('hidden');
+                updateChatInputState();
                 loadMessages();
+                document.getElementById('messageInput').focus();
             } else {
                 alert('Por favor, digite um nome!');
             }
@@ -324,6 +380,10 @@
         function sendMessage() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
+            if (message.length > 500) {
+                alert('Mensagem muito longa (maximo 500 caracteres).');
+                return;
+            }
             if (message && currentUser) {
                 messagesRef.push({
                     text: message,
@@ -335,11 +395,19 @@
         }
 
         function loadMessages() {
-            document.getElementById('chatMessages').innerHTML = '';
-            messagesRef.on('child_added', (snapshot) => {
+            stopListeningMessages();
+            document.getElementById('chatMessages').textContent = '';
+            messagesListener = messagesRef.on('child_added', (snapshot) => {
                 const msg = snapshot.val();
-                displayMessage(msg);
+                if (msg) displayMessage(msg);
             });
+        }
+
+        function stopListeningMessages() {
+            if (messagesListener) {
+                messagesRef.off('child_added', messagesListener);
+                messagesListener = null;
+            }
         }
 
         function displayMessage(msg) {
@@ -347,9 +415,20 @@
             const div = document.createElement('div');
             const isSent = msg.user === currentUser;
             div.className = 'message ' + (isSent ? 'sent' : 'received');
-            const time = new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
-            div.innerHTML = (msg.user !== currentUser ? '<div class="message-user">' + msg.user + '</div>' : '') + 
-                           msg.text + '<div class="message-time">' + time + '</div>';
+            const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+            if (!isSent) {
+                const userLabel = document.createElement('div');
+                userLabel.className = 'message-user';
+                userLabel.textContent = msg.user || 'Anonimo';
+                div.appendChild(userLabel);
+            }
+            const text = document.createElement('div');
+            text.textContent = msg.text || '';
+            div.appendChild(text);
+            const timeLabel = document.createElement('div');
+            timeLabel.className = 'message-time';
+            timeLabel.textContent = time;
+            div.appendChild(timeLabel);
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
@@ -359,6 +438,7 @@
         }
 
         document.getElementById('display').value = '0';
+        updateChatInputState();
     </script>
 </body>
 </html>
