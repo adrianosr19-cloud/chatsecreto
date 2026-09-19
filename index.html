@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .calculator {
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 350px;
+            width: 100%;
+        }
+        .display {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: right;
+            min-height: 100px;
+        }
+        .display input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 2.5em;
+            width: 100%;
+            text-align: right;
+            outline: none;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        .btn {
+            padding: 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.3em;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-number { background: #0f3460; color: #fff; }
+        .btn-number:hover { background: #1a4a7a; }
+        .btn-operator { background: #e94560; color: #fff; }
+        .btn-operator:hover { background: #ff6b6b; }
+        .btn-equal { background: #4ecca3; color: #1a1a2e; grid-column: span 2; grid-row: span 2; }
+        .btn-equal:hover { background: #7ee8c7; }
+        .btn-clear { background: #ffc107; color: #1a1a2e; }
+        .btn-clear:hover { background: #ffdb4d; }
+        
+        .secret-chat {
+            display: none;
+            background: #fff;
+            border-radius: 20px;
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+            height: 90vh;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            flex-direction: column;
+        }
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+            position: relative;
+        }
+        .back-btn {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+        .message {
+            margin-bottom: 12px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+            animation: slideIn 0.3s;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.sent {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        .message.received {
+            background: #e0e0e0;
+            color: #333;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+        .message-time {
+            font-size: 0.75em;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        .message-user {
+            font-size: 0.7em;
+            opacity: 0.8;
+            margin-bottom: 3px;
+            font-weight: bold;
+        }
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1em;
+        }
+        .chat-input:focus { border-color: #667eea; }
+        .send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .send-btn:hover { transform: scale(1.05); }
+        .instructions {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 0.85em;
+        }
+        .user-setup {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .user-setup input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 1em;
+        }
+        .user-setup button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="calculator" id="calculator">
+        <div class="instructions">💡 Digite 1234= para chat secreto</div>
+        <div class="display">
+            <input type="text" id="display" readonly placeholder="0">
+        </div>
+        <div class="buttons">
+            <button class="btn btn-clear" onclick="clearDisplay()">C</button>
+            <button class="btn btn-operator" onclick="appendToDisplay('/')">÷</button>
+            <button class="btn btn-operator" onclick="appendToDisplay('*')">×</button>
+            <button class="btn btn-operator" onclick="deleteLast()">⌫</button>
+            <button class="btn btn-number" onclick="appendToDisplay('7')">7</button>
+            <button class="btn btn-number" onclick="appendToDisplay('8')">8</button>
+            <button class="btn btn-number" onclick="appendToDisplay('9')">9</button>
+            <button class="btn btn-operator" onclick="appendToDisplay('-')">-</button>
+            <button class="btn btn-number" onclick="appendToDisplay('4')">4</button>
+            <button class="btn btn-number" onclick="appendToDisplay('5')">5</button>
+            <button class="btn btn-number" onclick="appendToDisplay('6')">6</button>
+            <button class="btn btn-operator" onclick="appendToDisplay('+')">+</button>
+            <button class="btn btn-number" onclick="appendToDisplay('1')">1</button>
+            <button class="btn btn-number" onclick="appendToDisplay('2')">2</button>
+            <button class="btn btn-number" onclick="appendToDisplay('3')">3</button>
+            <button class="btn btn-equal" onclick="calculate()">=</button>
+            <button class="btn btn-number" onclick="appendToDisplay('0')" style="grid-column: span 2">0</button>
+            <button class="btn btn-number" onclick="appendToDisplay('.')">.</button>
+        </div>
+    </div>
+
+    <div class="secret-chat" id="secretChat">
+        <div class="chat-header">
+            <button class="back-btn" onclick="backToCalculator()">← Voltar</button>
+            <h2>🔒 Chat Secreto</h2>
+        </div>
+        <div class="user-setup" id="userSetup">
+            <strong>Configure seu nome:</strong>
+            <input type="text" id="usernameInput" placeholder="Seu nome/apelido" maxlength="20">
+            <button onclick="setUsername()">Entrar no chat</button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="messageInput" placeholder="Digite sua mensagem..." onkeypress="handleKeyPress(event)">
+            <button class="send-btn" onclick="sendMessage()">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAcCfbDiEpXcGnJr1Go9vg87O7g4Ts-ZSE",
+            authDomain: "meuchatsecreto-ec2e9.firebaseapp.com",
+            databaseURL: "https://meuchatsecreto-ec2e9-default-rtdb.firebaseio.com",
+            projectId: "meuchatsecreto-ec2e9",
+            storageBucket: "meuchatsecreto-ec2e9.firebasestorage.app",
+            messagingSenderId: "183824040340",
+            appId: "1:183824040340:web:77f8178d76806094cdcf81"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const messagesRef = database.ref('secret_chat_messages');
+
+        let displayValue = '';
+        const SECRET_CODE = '1234';
+        let currentUser = localStorage.getItem('chat_username') || '';
+
+        function appendToDisplay(value) {
+            displayValue += value;
+            document.getElementById('display').value = displayValue;
+            if (displayValue.includes(SECRET_CODE + '=')) {
+                openSecretChat();
+                clearDisplay();
+            }
+        }
+
+        function clearDisplay() {
+            displayValue = '';
+            document.getElementById('display').value = '0';
+        }
+
+        function deleteLast() {
+            displayValue = displayValue.slice(0, -1);
+            document.getElementById('display').value = displayValue || '0';
+        }
+
+        function calculate() {
+            try {
+                const result = eval(displayValue);
+                displayValue = result.toString();
+                document.getElementById('display').value = displayValue;
+            } catch (error) {
+                document.getElementById('display').value = 'Erro';
+                setTimeout(clearDisplay, 1000);
+            }
+        }
+
+        function openSecretChat() {
+            document.getElementById('calculator').classList.add('hidden');
+            document.getElementById('secretChat').style.display = 'flex';
+            if (currentUser) {
+                document.getElementById('userSetup').classList.add('hidden');
+                loadMessages();
+            }
+        }
+
+        function backToCalculator() {
+            document.getElementById('secretChat').style.display = 'none';
+            document.getElementById('calculator').classList.remove('hidden');
+            clearDisplay();
+        }
+
+        function setUsername() {
+            const username = document.getElementById('usernameInput').value.trim();
+            if (username) {
+                currentUser = username;
+                localStorage.setItem('chat_username', username);
+                document.getElementById('userSetup').classList.add('hidden');
+                loadMessages();
+            } else {
+                alert('Por favor, digite um nome!');
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (message && currentUser) {
+                messagesRef.push({
+                    text: message,
+                    user: currentUser,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+                input.value = '';
+            }
+        }
+
+        function loadMessages() {
+            document.getElementById('chatMessages').innerHTML = '';
+            messagesRef.on('child_added', (snapshot) => {
+                const msg = snapshot.val();
+                displayMessage(msg);
+            });
+        }
+
+        function displayMessage(msg) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            const isSent = msg.user === currentUser;
+            div.className = 'message ' + (isSent ? 'sent' : 'received');
+            const time = new Date(msg.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+            div.innerHTML = (msg.user !== currentUser ? '<div class="message-user">' + msg.user + '</div>' : '') + 
+                           msg.text + '<div class="message-time">' + time + '</div>';
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') sendMessage();
+        }
+
+        document.getElementById('display').value = '0';
+    </script>
+</body>
+</html>
