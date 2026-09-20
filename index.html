@@ -233,7 +233,12 @@
             <button class="back-btn" onclick="backToCalculator()">← Voltar</button>
             <h2>🔒 Chat Secreto</h2>
         </div>
-        <div class="user-setup" id="userSetup">
+        <div class="user-setup" id="passwordSetup">
+            <strong>Senha do chat:</strong>
+            <input type="password" id="passwordInput" placeholder="Digite a senha da sala" maxlength="64" onkeypress="if (event.key === 'Enter') enterRoom()">
+            <button id="passwordButton" onclick="enterRoom()">Continuar</button>
+        </div>
+        <div class="user-setup hidden" id="userSetup">
             <strong>Configure seu nome:</strong>
             <input type="text" id="usernameInput" placeholder="Seu nome/apelido" maxlength="20">
             <button onclick="setUsername()">Entrar no chat</button>
@@ -258,7 +263,7 @@
 
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-        const messagesRef = database.ref('secret_chat_messages');
+        let messagesRef = null;
 
         let displayValue = '';
         const SECRET_CODE = '1234';
@@ -343,24 +348,72 @@
         function openSecretChat() {
             document.getElementById('calculator').classList.add('hidden');
             document.getElementById('secretChat').style.display = 'flex';
-            if (currentUser) {
-                document.getElementById('userSetup').classList.add('hidden');
-                loadMessages();
-            }
+            document.getElementById('passwordSetup').classList.remove('hidden');
+            document.getElementById('userSetup').classList.add('hidden');
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('chatMessages').textContent = '';
             updateChatInputState();
+            document.getElementById('passwordInput').focus();
         }
 
         function backToCalculator() {
             stopListeningMessages();
+            messagesRef = null;
             document.getElementById('secretChat').style.display = 'none';
             document.getElementById('calculator').classList.remove('hidden');
             clearDisplay();
         }
 
         function updateChatInputState() {
-            const hasUser = Boolean(currentUser);
-            document.getElementById('messageInput').disabled = !hasUser;
-            document.querySelector('.send-btn').disabled = !hasUser;
+            const ready = Boolean(currentUser && messagesRef);
+            document.getElementById('messageInput').disabled = !ready;
+            document.querySelector('.send-btn').disabled = !ready;
+        }
+
+        async function hashPassword(password) {
+            const data = new TextEncoder().encode('chatsecreto:' + password);
+            const digest = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function enterRoom() {
+            const input = document.getElementById('passwordInput');
+            const button = document.getElementById('passwordButton');
+            const password = input.value;
+            if (password.length < 4) {
+                alert('A senha precisa ter pelo menos 4 caracteres.');
+                return;
+            }
+            if (!window.crypto || !crypto.subtle) {
+                alert('Este navegador nao suporta o chat protegido (abra o site por HTTPS).');
+                return;
+            }
+            button.disabled = true;
+            try {
+                const roomId = await hashPassword(password);
+                const candidateRef = database.ref('rooms/' + roomId);
+                const meta = await candidateRef.child('meta').once('value');
+                if (!meta.exists()) {
+                    const create = confirm('Nenhuma sala existe com esta senha. Criar uma nova sala com ela?');
+                    if (!create) return;
+                    await candidateRef.child('meta').set({ created: firebase.database.ServerValue.TIMESTAMP });
+                }
+                messagesRef = candidateRef.child('messages');
+                input.value = '';
+                document.getElementById('passwordSetup').classList.add('hidden');
+                if (currentUser) {
+                    loadMessages();
+                    document.getElementById('messageInput').focus();
+                } else {
+                    document.getElementById('userSetup').classList.remove('hidden');
+                    document.getElementById('usernameInput').focus();
+                }
+                updateChatInputState();
+            } catch (error) {
+                alert('Nao foi possivel acessar a sala. Verifique a conexao e as regras do Firebase.');
+            } finally {
+                button.disabled = false;
+            }
         }
 
         function setUsername() {
@@ -384,30 +437,35 @@
                 alert('Mensagem muito longa (maximo 500 caracteres).');
                 return;
             }
-            if (message && currentUser) {
+            if (message && currentUser && messagesRef) {
                 messagesRef.push({
                     text: message,
                     user: currentUser,
                     timestamp: firebase.database.ServerValue.TIMESTAMP
-                });
+                }).catch(() => alert('Mensagem recusada pelo servidor.'));
                 input.value = '';
             }
         }
 
+        let listeningRef = null;
+
         function loadMessages() {
             stopListeningMessages();
+            if (!messagesRef) return;
             document.getElementById('chatMessages').textContent = '';
+            listeningRef = messagesRef;
             messagesListener = messagesRef.on('child_added', (snapshot) => {
                 const msg = snapshot.val();
                 if (msg) displayMessage(msg);
-            });
+            }, () => alert('Acesso negado. Verifique as regras do Firebase.'));
         }
 
         function stopListeningMessages() {
-            if (messagesListener) {
-                messagesRef.off('child_added', messagesListener);
-                messagesListener = null;
+            if (messagesListener && listeningRef) {
+                listeningRef.off('child_added', messagesListener);
             }
+            messagesListener = null;
+            listeningRef = null;
         }
 
         function displayMessage(msg) {
