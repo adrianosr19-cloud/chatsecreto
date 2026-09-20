@@ -2,25 +2,53 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "admins": {
+      "$key": {
+        ".read": "$key.matches(/^[a-f0-9]{64}$/)",
+        ".write": "$key.matches(/^[a-f0-9]{64}$/) && !root.child('admins').exists() && newData.val() === true"
+      }
+    },
+    "admin_rooms": {
+      "$key": {
+        ".read": "$key.matches(/^[a-f0-9]{64}$/) && root.child('admins').child($key).exists()",
+        ".write": "$key.matches(/^[a-f0-9]{64}$/) && root.child('admins').child($key).exists()",
+        "$room": {
+          ".validate": "$room.matches(/^[a-f0-9]{64}$/) && (newData.val() === 'delete' || newData.hasChildren(['name', 'password', 'created']))",
+          "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40" },
+          "password": { ".validate": "newData.isString() && newData.val().length >= 4 && newData.val().length <= 64" },
+          "created": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
     "rooms": {
       "$room": {
-        ".read": "$room.matches(/^[a-f0-9]{64}$/)",
+        ".write": "$room.matches(/^[a-f0-9]{64}$/) && ((!data.exists() && root.child('admins').child(newData.child('meta/key').val()).exists()) || (!newData.exists() && root.child('admin_rooms').child(data.child('meta/key').val()).child($room).val() === 'delete'))",
+        ".validate": "newData.hasChildren(['meta', 'info'])",
         "meta": {
-          ".write": "$room.matches(/^[a-f0-9]{64}$/) && !data.exists()",
-          ".validate": "newData.hasChildren(['created'])",
+          ".validate": "newData.hasChildren(['key'])",
+          "key": { ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{64}$/)" },
+          "$other": { ".validate": false }
+        },
+        "info": {
+          ".read": "$room.matches(/^[a-f0-9]{64}$/)",
+          ".validate": "newData.hasChildren(['name', 'created'])",
+          "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40" },
           "created": { ".validate": "newData.isNumber()" },
           "$other": { ".validate": false }
         },
         "messages": {
+          ".read": "$room.matches(/^[a-f0-9]{64}$/)",
           "$message": {
-            ".write": "$room.matches(/^[a-f0-9]{64}$/) && !data.exists()",
+            ".write": "$room.matches(/^[a-f0-9]{64}$/) && !data.exists() && root.child('rooms').child($room).child('meta').exists()",
             ".validate": "newData.hasChildren(['text', 'user', 'timestamp'])",
             "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500" },
             "user": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 20" },
             "timestamp": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }
-        }
+        },
+        "$other": { ".validate": false }
       }
     }
   }

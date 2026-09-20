@@ -2,45 +2,87 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0f19">
     <title>Calculadora</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0b0f19;
+            --panel: rgba(255, 255, 255, 0.04);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --key: #161c2b;
+            --key-hover: #1f2739;
+            --key-op: #232b40;
+            --accent: #ff8a3d;
+            --accent-2: #ff5f7e;
+            --accent-soft: rgba(255, 138, 61, 0.15);
+            --text: #f5f7fb;
+            --muted: #8b93a7;
+            --danger: #ff5f7e;
+            --ok: #38d39f;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            background-image:
+                radial-gradient(60% 50% at 10% 0%, rgba(255, 138, 61, 0.18), transparent 60%),
+                radial-gradient(50% 45% at 100% 100%, rgba(255, 95, 126, 0.16), transparent 60%);
+            color: var(--text);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
         }
+        button { font-family: inherit; }
+        .hidden { display: none !important; }
+
+        /* ---------- Calculadora ---------- */
         .calculator {
-            background: #1a1a2e;
-            border-radius: 20px;
-            padding: 25px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 350px;
             width: 100%;
+            max-width: 360px;
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 32px;
+            padding: 26px 22px 22px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
         .display {
-            background: #16213e;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            text-align: right;
-            min-height: 100px;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: flex-end;
+            padding: 8px 6px 18px;
+            gap: 6px;
+        }
+        .display-expression {
+            color: var(--muted);
+            font-size: 1.05rem;
+            min-height: 1.4em;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
         }
         .display input {
             background: transparent;
             border: none;
-            color: #fff;
-            font-size: 2.5em;
+            color: var(--text);
+            font-size: 3.4rem;
+            font-weight: 300;
+            letter-spacing: -0.02em;
             width: 100%;
             text-align: right;
             outline: none;
+            font-variant-numeric: tabular-nums;
         }
         .buttons {
             display: grid;
@@ -48,205 +90,271 @@
             gap: 12px;
         }
         .btn {
-            padding: 20px;
+            aspect-ratio: 1;
+            border: none;
+            border-radius: 50%;
+            font-size: 1.45rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: var(--text);
+            background: var(--key);
+            transition: transform 0.08s ease, background 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            user-select: none;
+        }
+        .btn:hover { background: var(--key-hover); }
+        .btn:active { transform: scale(0.94); }
+        .btn-operator { background: var(--key-op); color: var(--accent); }
+        .btn-operator:hover { background: #2b3550; }
+        .btn-func { background: var(--key-op); color: var(--muted); font-size: 1.2rem; }
+        .btn-func:hover { background: #2b3550; color: var(--text); }
+        .btn-equal {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #fff;
+            box-shadow: 0 10px 30px rgba(255, 120, 90, 0.35);
+        }
+        .btn-equal:hover { filter: brightness(1.08); }
+        .btn-zero { aspect-ratio: auto; grid-column: span 2; border-radius: 999px; text-align: left; padding-left: 30px; }
+
+        /* ---------- Paineis (chat / admin) ---------- */
+        .panel {
+            display: none;
+            width: 100%;
+            max-width: 420px;
+            height: min(92vh, 780px);
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 28px;
+            padding: 18px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+            flex-direction: column;
+            gap: 14px;
+        }
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 4px 2px;
+        }
+        .panel-header h2 { font-size: 1.15rem; font-weight: 600; flex: 1; }
+        .panel-header .sub { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+        .icon-btn {
+            background: var(--key);
+            border: 1px solid var(--panel-border);
+            color: var(--text);
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            display: grid;
+            place-items: center;
+        }
+        .icon-btn:hover { background: var(--key-hover); }
+
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--panel-border);
+            border-radius: 18px;
+            padding: 16px;
+        }
+        .card label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
+        .field {
+            width: 100%;
+            padding: 13px 14px;
+            background: var(--key);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+        }
+        .field:focus { border-color: var(--accent); }
+        .field + .field { margin-top: 10px; }
+        .primary {
+            width: 100%;
+            margin-top: 12px;
+            padding: 13px;
             border: none;
             border-radius: 12px;
-            font-size: 1.3em;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .btn-number { background: #0f3460; color: #fff; }
-        .btn-number:hover { background: #1a4a7a; }
-        .btn-operator { background: #e94560; color: #fff; }
-        .btn-operator:hover { background: #ff6b6b; }
-        .btn-equal { background: #4ecca3; color: #1a1a2e; grid-column: span 2; grid-row: span 2; }
-        .btn-equal:hover { background: #7ee8c7; }
-        .btn-clear { background: #ffc107; color: #1a1a2e; }
-        .btn-clear:hover { background: #ffdb4d; }
-        
-        .secret-chat {
-            display: none;
-            background: #fff;
-            border-radius: 20px;
-            padding: 20px;
-            max-width: 400px;
-            width: 100%;
-            height: 90vh;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            flex-direction: column;
-        }
-        .chat-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px;
-            border-radius: 15px;
-            margin-bottom: 15px;
-            text-align: center;
-            position: relative;
-        }
-        .back-btn {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            padding: 8px 15px;
-            border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.98rem;
             cursor: pointer;
         }
+        .primary:disabled { opacity: 0.5; cursor: default; }
+        .primary:hover:not(:disabled) { filter: brightness(1.08); }
+        .status { font-size: 0.85rem; color: var(--muted); margin-top: 10px; min-height: 1.2em; }
+        .status.error { color: var(--danger); }
+        .status.ok { color: var(--ok); }
+
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 15px;
-            background: #f5f5f5;
-            border-radius: 15px;
-            margin-bottom: 15px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 18px;
+            display: flex;
+            flex-direction: column;
         }
         .message {
-            margin-bottom: 12px;
-            padding: 10px 15px;
-            border-radius: 15px;
+            margin-bottom: 10px;
+            padding: 10px 14px;
+            border-radius: 16px;
             max-width: 80%;
             word-wrap: break-word;
-            animation: slideIn 0.3s;
+            animation: slideIn 0.25s ease;
+            font-size: 0.95rem;
         }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .message.sent {
-            background: #667eea;
-            color: white;
-            margin-left: auto;
-            border-bottom-right-radius: 5px;
-        }
-        .message.received {
-            background: #e0e0e0;
-            color: #333;
-            margin-right: auto;
-            border-bottom-left-radius: 5px;
-        }
-        .message-time {
-            font-size: 0.75em;
-            opacity: 0.7;
-            margin-top: 5px;
-        }
-        .message-user {
-            font-size: 0.7em;
-            opacity: 0.8;
-            margin-bottom: 3px;
-            font-weight: bold;
-        }
-        .chat-input-area {
-            display: flex;
-            gap: 10px;
-        }
-        .chat-input {
-            flex: 1;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
-            outline: none;
-            font-size: 1em;
-        }
-        .chat-input:focus { border-color: #667eea; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        .message.sent { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+        .message.received { background: var(--key-op); color: var(--text); margin-right: auto; border-bottom-left-radius: 4px; }
+        .message-time { font-size: 0.7rem; opacity: 0.7; margin-top: 4px; text-align: right; }
+        .message-user { font-size: 0.72rem; color: var(--accent); margin-bottom: 3px; font-weight: 600; }
+        .chat-input-area { display: flex; gap: 10px; }
+        .chat-input-area .field { border-radius: 999px; flex: 1; }
         .send-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
             color: white;
             border: none;
-            padding: 12px 25px;
-            border-radius: 25px;
+            padding: 0 22px;
+            border-radius: 999px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
         }
-        .send-btn:hover { transform: scale(1.05); }
-        .instructions {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            text-align: center;
-            font-size: 0.85em;
+        .send-btn:disabled { opacity: 0.4; cursor: default; }
+
+        /* ---------- Admin ---------- */
+        .admin-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+        .room-list { display: flex; flex-direction: column; gap: 10px; }
+        .room-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 12px 14px;
         }
-        .user-setup {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            padding: 15px;
+        .room-item .info { flex: 1; min-width: 0; }
+        .room-item .name { font-weight: 600; font-size: 0.98rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .room-item .pass { font-size: 0.82rem; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 2px; }
+        .room-item .pass span { letter-spacing: 0.15em; }
+        .room-item .date { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+        .room-actions { display: flex; gap: 6px; }
+        .mini {
+            background: var(--key);
+            border: 1px solid var(--panel-border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
             border-radius: 10px;
-            margin-bottom: 15px;
-        }
-        .user-setup input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin-top: 10px;
-            font-size: 1em;
-        }
-        .user-setup button {
-            width: 100%;
-            padding: 12px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            margin-top: 10px;
             cursor: pointer;
-            font-weight: bold;
+            display: grid;
+            place-items: center;
+            font-size: 0.95rem;
         }
-        .hidden { display: none !important; }
+        .mini:hover { background: var(--key-hover); }
+        .mini.danger { color: var(--danger); }
+        .empty { text-align: center; color: var(--muted); font-size: 0.9rem; padding: 20px 0; }
+        .row { display: flex; gap: 10px; }
+        .row .field { margin-top: 0; }
+        .ghost {
+            background: transparent;
+            border: 1px solid var(--panel-border);
+            color: var(--muted);
+            border-radius: 12px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .ghost:hover { color: var(--text); background: var(--key); }
+        .hint { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
     </style>
 </head>
 <body>
     <div class="calculator" id="calculator">
-        <div class="instructions">💡 Digite 1234 e toque em = para o chat secreto</div>
         <div class="display">
-            <input type="text" id="display" readonly placeholder="0">
+            <div class="display-expression" id="displayExpression"></div>
+            <input type="text" id="display" readonly placeholder="0" aria-label="Resultado">
         </div>
         <div class="buttons">
-            <button class="btn btn-clear" onclick="clearDisplay()">C</button>
+            <button class="btn btn-func" onclick="clearDisplay()">AC</button>
+            <button class="btn btn-func" onclick="deleteLast()">⌫</button>
+            <button class="btn btn-func" onclick="percent()">%</button>
             <button class="btn btn-operator" onclick="appendToDisplay('/')">÷</button>
+            <button class="btn" onclick="appendToDisplay('7')">7</button>
+            <button class="btn" onclick="appendToDisplay('8')">8</button>
+            <button class="btn" onclick="appendToDisplay('9')">9</button>
             <button class="btn btn-operator" onclick="appendToDisplay('*')">×</button>
-            <button class="btn btn-operator" onclick="deleteLast()">⌫</button>
-            <button class="btn btn-number" onclick="appendToDisplay('7')">7</button>
-            <button class="btn btn-number" onclick="appendToDisplay('8')">8</button>
-            <button class="btn btn-number" onclick="appendToDisplay('9')">9</button>
-            <button class="btn btn-operator" onclick="appendToDisplay('-')">-</button>
-            <button class="btn btn-number" onclick="appendToDisplay('4')">4</button>
-            <button class="btn btn-number" onclick="appendToDisplay('5')">5</button>
-            <button class="btn btn-number" onclick="appendToDisplay('6')">6</button>
+            <button class="btn" onclick="appendToDisplay('4')">4</button>
+            <button class="btn" onclick="appendToDisplay('5')">5</button>
+            <button class="btn" onclick="appendToDisplay('6')">6</button>
+            <button class="btn btn-operator" onclick="appendToDisplay('-')">−</button>
+            <button class="btn" onclick="appendToDisplay('1')">1</button>
+            <button class="btn" onclick="appendToDisplay('2')">2</button>
+            <button class="btn" onclick="appendToDisplay('3')">3</button>
             <button class="btn btn-operator" onclick="appendToDisplay('+')">+</button>
-            <button class="btn btn-number" onclick="appendToDisplay('1')">1</button>
-            <button class="btn btn-number" onclick="appendToDisplay('2')">2</button>
-            <button class="btn btn-number" onclick="appendToDisplay('3')">3</button>
+            <button class="btn btn-zero" onclick="appendToDisplay('0')">0</button>
+            <button class="btn" onclick="appendToDisplay('.')">,</button>
             <button class="btn btn-equal" onclick="calculate()">=</button>
-            <button class="btn btn-number" onclick="appendToDisplay('0')" style="grid-column: span 2">0</button>
-            <button class="btn btn-number" onclick="appendToDisplay('.')">.</button>
         </div>
     </div>
 
-    <div class="secret-chat" id="secretChat">
-        <div class="chat-header">
-            <button class="back-btn" onclick="backToCalculator()">← Voltar</button>
-            <h2>🔒 Chat Secreto</h2>
+    <div class="panel" id="secretChat">
+        <div class="panel-header">
+            <button class="icon-btn" onclick="backToCalculator()" title="Voltar">←</button>
+            <h2>Chat Secreto<span class="sub" id="roomName">Sala protegida</span></h2>
         </div>
-        <div class="user-setup" id="passwordSetup">
-            <strong>Senha do chat:</strong>
-            <input type="password" id="passwordInput" placeholder="Digite a senha da sala" maxlength="64" onkeypress="if (event.key === 'Enter') enterRoom()">
-            <button id="passwordButton" onclick="enterRoom()">Continuar</button>
+        <div class="card" id="passwordSetup">
+            <label for="passwordInput">Senha da sala</label>
+            <input type="password" class="field" id="passwordInput" placeholder="Digite a senha" maxlength="64" onkeypress="if (event.key === 'Enter') enterRoom()">
+            <button class="primary" id="passwordButton" onclick="enterRoom()">Entrar</button>
+            <div class="status" id="passwordStatus"></div>
         </div>
-        <div class="user-setup hidden" id="userSetup">
-            <strong>Configure seu nome:</strong>
-            <input type="text" id="usernameInput" placeholder="Seu nome/apelido" maxlength="20">
-            <button onclick="setUsername()">Entrar no chat</button>
+        <div class="card hidden" id="userSetup">
+            <label for="usernameInput">Seu nome ou apelido</label>
+            <input type="text" class="field" id="usernameInput" placeholder="Como quer aparecer?" maxlength="20" onkeypress="if (event.key === 'Enter') setUsername()">
+            <button class="primary" onclick="setUsername()">Entrar no chat</button>
         </div>
         <div class="chat-messages" id="chatMessages"></div>
         <div class="chat-input-area">
-            <input type="text" class="chat-input" id="messageInput" placeholder="Digite sua mensagem..." maxlength="500" onkeypress="handleKeyPress(event)">
-            <button class="send-btn" onclick="sendMessage()">Enviar</button>
+            <input type="text" class="field" id="messageInput" placeholder="Digite sua mensagem..." maxlength="500" onkeypress="handleKeyPress(event)">
+            <button class="send-btn" id="sendButton" onclick="sendMessage()">Enviar</button>
+        </div>
+    </div>
+
+    <div class="panel" id="adminPanel">
+        <div class="panel-header">
+            <button class="icon-btn" onclick="backToCalculator()" title="Voltar">←</button>
+            <h2>Painel do Admin<span class="sub" id="adminSub">Acesso restrito</span></h2>
+            <button class="icon-btn hidden" id="adminLogout" onclick="adminLogout()" title="Sair">⎋</button>
+        </div>
+        <div class="card" id="adminLogin">
+            <label for="adminPasswordInput">Senha de administrador</label>
+            <input type="password" class="field" id="adminPasswordInput" placeholder="Digite a senha do admin" maxlength="64" onkeypress="if (event.key === 'Enter') adminLoginSubmit()">
+            <button class="primary" id="adminLoginButton" onclick="adminLoginSubmit()">Entrar</button>
+            <div class="status" id="adminLoginStatus"></div>
+            <p class="hint">Na primeira vez, a senha digitada aqui vira a senha do admin. Guarde-a bem: nao ha recuperacao.</p>
+        </div>
+        <div class="admin-body hidden" id="adminContent">
+            <div class="card">
+                <label>Nova sala</label>
+                <input type="text" class="field" id="newRoomName" placeholder="Nome da sala (ex.: Familia)" maxlength="40">
+                <div class="row" style="margin-top: 10px">
+                    <input type="text" class="field" id="newRoomPassword" placeholder="Senha da sala (min. 4)" maxlength="64" autocomplete="off">
+                    <button class="ghost" onclick="generatePassword()" title="Gerar senha">Gerar</button>
+                </div>
+                <button class="primary" id="createRoomButton" onclick="createRoom()">Criar sala</button>
+                <div class="status" id="createRoomStatus"></div>
+            </div>
+            <div>
+                <label class="hint" style="display:block; margin: 0 4px 8px">Salas criadas</label>
+                <div class="room-list" id="roomList"><div class="empty">Carregando...</div></div>
+            </div>
         </div>
     </div>
 
@@ -267,22 +375,62 @@
 
         let displayValue = '';
         const SECRET_CODE = '1234';
+        const ADMIN_CODE = '4321';
         let currentUser = localStorage.getItem('chat_username') || '';
         let messagesListener = null;
 
+        const $ = (id) => document.getElementById(id);
+
+        // ---------- Calculadora ----------
+        function formatDisplay(value) {
+            return value.replace(/\*/g, '×').replace(/\//g, '÷').replace(/-/g, '−').replace(/\./g, ',');
+        }
+
+        function renderDisplay() {
+            $('display').value = formatDisplay(displayValue) || '0';
+        }
+
         function appendToDisplay(value) {
+            const isOperator = /^[+\-*/]$/.test(value);
+            if (isOperator && /[+\-*/]$/.test(displayValue)) {
+                displayValue = displayValue.slice(0, -1);
+            }
+            if (isOperator && value !== '-' && displayValue === '') return;
+            if (value === '.') {
+                const lastNumber = displayValue.split(/[+\-*/]/).pop();
+                if (lastNumber.includes('.')) return;
+                if (lastNumber === '') value = '0.';
+            }
             displayValue += value;
-            document.getElementById('display').value = displayValue;
+            $('displayExpression').textContent = '';
+            renderDisplay();
         }
 
         function clearDisplay() {
             displayValue = '';
-            document.getElementById('display').value = '0';
+            $('displayExpression').textContent = '';
+            renderDisplay();
         }
 
         function deleteLast() {
             displayValue = displayValue.slice(0, -1);
-            document.getElementById('display').value = displayValue || '0';
+            renderDisplay();
+        }
+
+        function percent() {
+            try {
+                const result = evaluateExpression(displayValue) / 100;
+                if (!isFinite(result)) throw new Error();
+                displayValue = String(Math.round(result * 1e10) / 1e10);
+                renderDisplay();
+            } catch (error) {
+                showCalcError();
+            }
+        }
+
+        function showCalcError() {
+            $('display').value = 'Erro';
+            setTimeout(clearDisplay, 900);
         }
 
         function calculate() {
@@ -291,14 +439,20 @@
                 openSecretChat();
                 return;
             }
+            if (displayValue === ADMIN_CODE) {
+                clearDisplay();
+                openAdminPanel();
+                return;
+            }
+            if (!displayValue) return;
             try {
                 const result = evaluateExpression(displayValue);
                 if (!isFinite(result)) throw new Error('Resultado invalido');
+                $('displayExpression').textContent = formatDisplay(displayValue) + ' =';
                 displayValue = String(Math.round(result * 1e10) / 1e10);
-                document.getElementById('display').value = displayValue;
+                renderDisplay();
             } catch (error) {
-                document.getElementById('display').value = 'Erro';
-                setTimeout(clearDisplay, 1000);
+                showCalcError();
             }
         }
 
@@ -345,93 +499,118 @@
             else values.push(left / right);
         }
 
-        function openSecretChat() {
-            document.getElementById('calculator').classList.add('hidden');
-            document.getElementById('secretChat').style.display = 'flex';
-            document.getElementById('passwordSetup').classList.remove('hidden');
-            document.getElementById('userSetup').classList.add('hidden');
-            document.getElementById('passwordInput').value = '';
-            document.getElementById('chatMessages').textContent = '';
-            updateChatInputState();
-            document.getElementById('passwordInput').focus();
+        // ---------- Navegacao ----------
+        function showPanel(id) {
+            $('calculator').classList.add('hidden');
+            $('secretChat').style.display = id === 'secretChat' ? 'flex' : 'none';
+            $('adminPanel').style.display = id === 'adminPanel' ? 'flex' : 'none';
         }
 
         function backToCalculator() {
             stopListeningMessages();
+            stopListeningRooms();
             messagesRef = null;
-            document.getElementById('secretChat').style.display = 'none';
-            document.getElementById('calculator').classList.remove('hidden');
+            $('secretChat').style.display = 'none';
+            $('adminPanel').style.display = 'none';
+            $('calculator').classList.remove('hidden');
             clearDisplay();
         }
 
-        function updateChatInputState() {
-            const ready = Boolean(currentUser && messagesRef);
-            document.getElementById('messageInput').disabled = !ready;
-            document.querySelector('.send-btn').disabled = !ready;
+        function setStatus(id, text, type) {
+            const el = $(id);
+            el.textContent = text || '';
+            el.className = 'status' + (type ? ' ' + type : '');
         }
 
-        async function hashPassword(password) {
-            const data = new TextEncoder().encode('chatsecreto:' + password);
+        async function sha256(text) {
+            const data = new TextEncoder().encode(text);
             const digest = await crypto.subtle.digest('SHA-256', data);
             return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
+        function hashPassword(password) { return sha256('chatsecreto:' + password); }
+        function hashAdminKey(password) { return sha256('chatsecreto-admin:' + password); }
+
+        function cryptoAvailable() {
+            if (window.crypto && crypto.subtle) return true;
+            alert('Este navegador nao suporta o chat protegido (abra o site por HTTPS).');
+            return false;
+        }
+
+        // ---------- Chat ----------
+        function openSecretChat() {
+            showPanel('secretChat');
+            $('passwordSetup').classList.remove('hidden');
+            $('userSetup').classList.add('hidden');
+            $('passwordInput').value = '';
+            $('roomName').textContent = 'Sala protegida';
+            $('chatMessages').textContent = '';
+            setStatus('passwordStatus', '');
+            updateChatInputState();
+            $('passwordInput').focus();
+        }
+
+        function updateChatInputState() {
+            const ready = Boolean(currentUser && messagesRef);
+            $('messageInput').disabled = !ready;
+            $('sendButton').disabled = !ready;
+        }
+
         async function enterRoom() {
-            const input = document.getElementById('passwordInput');
-            const button = document.getElementById('passwordButton');
+            const input = $('passwordInput');
+            const button = $('passwordButton');
             const password = input.value;
             if (password.length < 4) {
-                alert('A senha precisa ter pelo menos 4 caracteres.');
+                setStatus('passwordStatus', 'A senha precisa ter pelo menos 4 caracteres.', 'error');
                 return;
             }
-            if (!window.crypto || !crypto.subtle) {
-                alert('Este navegador nao suporta o chat protegido (abra o site por HTTPS).');
-                return;
-            }
+            if (!cryptoAvailable()) return;
             button.disabled = true;
+            setStatus('passwordStatus', 'Verificando...');
             try {
                 const roomId = await hashPassword(password);
                 const candidateRef = database.ref('rooms/' + roomId);
-                const meta = await candidateRef.child('meta').once('value');
-                if (!meta.exists()) {
-                    const create = confirm('Nenhuma sala existe com esta senha. Criar uma nova sala com ela?');
-                    if (!create) return;
-                    await candidateRef.child('meta').set({ created: firebase.database.ServerValue.TIMESTAMP });
+                const info = await candidateRef.child('info').once('value');
+                if (!info.exists()) {
+                    setStatus('passwordStatus', 'Senha incorreta.', 'error');
+                    return;
                 }
                 messagesRef = candidateRef.child('messages');
+                $('roomName').textContent = info.val().name || 'Sala protegida';
                 input.value = '';
-                document.getElementById('passwordSetup').classList.add('hidden');
+                setStatus('passwordStatus', '');
+                $('passwordSetup').classList.add('hidden');
                 if (currentUser) {
                     loadMessages();
-                    document.getElementById('messageInput').focus();
+                    $('messageInput').focus();
                 } else {
-                    document.getElementById('userSetup').classList.remove('hidden');
-                    document.getElementById('usernameInput').focus();
+                    $('userSetup').classList.remove('hidden');
+                    $('usernameInput').focus();
                 }
                 updateChatInputState();
             } catch (error) {
-                alert('Nao foi possivel acessar a sala. Verifique a conexao e as regras do Firebase.');
+                setStatus('passwordStatus', 'Nao foi possivel acessar a sala. Verifique a conexao.', 'error');
             } finally {
                 button.disabled = false;
             }
         }
 
         function setUsername() {
-            const username = document.getElementById('usernameInput').value.trim();
+            const username = $('usernameInput').value.trim();
             if (username) {
                 currentUser = username;
                 localStorage.setItem('chat_username', username);
-                document.getElementById('userSetup').classList.add('hidden');
+                $('userSetup').classList.add('hidden');
                 updateChatInputState();
                 loadMessages();
-                document.getElementById('messageInput').focus();
+                $('messageInput').focus();
             } else {
                 alert('Por favor, digite um nome!');
             }
         }
 
         function sendMessage() {
-            const input = document.getElementById('messageInput');
+            const input = $('messageInput');
             const message = input.value.trim();
             if (message.length > 500) {
                 alert('Mensagem muito longa (maximo 500 caracteres).');
@@ -452,7 +631,7 @@
         function loadMessages() {
             stopListeningMessages();
             if (!messagesRef) return;
-            document.getElementById('chatMessages').textContent = '';
+            $('chatMessages').textContent = '';
             listeningRef = messagesRef;
             messagesListener = messagesRef.on('child_added', (snapshot) => {
                 const msg = snapshot.val();
@@ -469,7 +648,7 @@
         }
 
         function displayMessage(msg) {
-            const container = document.getElementById('chatMessages');
+            const container = $('chatMessages');
             const div = document.createElement('div');
             const isSent = msg.user === currentUser;
             div.className = 'message ' + (isSent ? 'sent' : 'received');
@@ -495,7 +674,226 @@
             if (event.key === 'Enter') sendMessage();
         }
 
-        document.getElementById('display').value = '0';
+        // ---------- Admin ----------
+        let adminKey = sessionStorage.getItem('admin_key') || '';
+        let roomsRef = null;
+        let roomsListener = null;
+        const revealed = new Set();
+
+        function openAdminPanel() {
+            showPanel('adminPanel');
+            $('adminPasswordInput').value = '';
+            setStatus('adminLoginStatus', '');
+            if (adminKey) {
+                showAdminContent();
+            } else {
+                $('adminLogin').classList.remove('hidden');
+                $('adminContent').classList.add('hidden');
+                $('adminLogout').classList.add('hidden');
+                $('adminSub').textContent = 'Acesso restrito';
+                $('adminPasswordInput').focus();
+            }
+        }
+
+        async function adminLoginSubmit() {
+            const password = $('adminPasswordInput').value;
+            const button = $('adminLoginButton');
+            if (password.length < 6) {
+                setStatus('adminLoginStatus', 'A senha do admin precisa ter pelo menos 6 caracteres.', 'error');
+                return;
+            }
+            if (!cryptoAvailable()) return;
+            button.disabled = true;
+            setStatus('adminLoginStatus', 'Verificando...');
+            try {
+                const key = await hashAdminKey(password);
+                const ref = database.ref('admins/' + key);
+                const snap = await ref.once('value');
+                if (!snap.exists()) {
+                    try {
+                        await ref.set(true);
+                        setStatus('adminLoginStatus', 'Senha do admin definida com sucesso!', 'ok');
+                    } catch (error) {
+                        setStatus('adminLoginStatus', 'Senha incorreta.', 'error');
+                        return;
+                    }
+                }
+                adminKey = key;
+                sessionStorage.setItem('admin_key', key);
+                $('adminPasswordInput').value = '';
+                showAdminContent();
+            } catch (error) {
+                setStatus('adminLoginStatus', 'Nao foi possivel verificar. Confira a conexao e as regras do Firebase.', 'error');
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function adminLogout() {
+            adminKey = '';
+            sessionStorage.removeItem('admin_key');
+            stopListeningRooms();
+            openAdminPanel();
+        }
+
+        function showAdminContent() {
+            $('adminLogin').classList.add('hidden');
+            $('adminContent').classList.remove('hidden');
+            $('adminLogout').classList.remove('hidden');
+            $('adminSub').textContent = 'Salas e senhas';
+            setStatus('createRoomStatus', '');
+            listenRooms();
+            $('newRoomName').focus();
+        }
+
+        function listenRooms() {
+            stopListeningRooms();
+            roomsRef = database.ref('admin_rooms/' + adminKey);
+            roomsListener = roomsRef.on('value', (snapshot) => {
+                renderRooms(snapshot.val() || {});
+            }, () => {
+                setStatus('createRoomStatus', 'Sessao invalida. Entre novamente.', 'error');
+                adminLogout();
+            });
+        }
+
+        function stopListeningRooms() {
+            if (roomsRef && roomsListener) roomsRef.off('value', roomsListener);
+            roomsRef = null;
+            roomsListener = null;
+        }
+
+        function generatePassword() {
+            const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+            const bytes = new Uint8Array(8);
+            crypto.getRandomValues(bytes);
+            $('newRoomPassword').value = Array.from(bytes).map(b => alphabet[b % alphabet.length]).join('');
+        }
+
+        async function createRoom() {
+            const name = $('newRoomName').value.trim();
+            const password = $('newRoomPassword').value.trim();
+            const button = $('createRoomButton');
+            if (!name) {
+                setStatus('createRoomStatus', 'De um nome para a sala.', 'error');
+                return;
+            }
+            if (password.length < 4) {
+                setStatus('createRoomStatus', 'A senha precisa ter pelo menos 4 caracteres.', 'error');
+                return;
+            }
+            if (!cryptoAvailable()) return;
+            button.disabled = true;
+            setStatus('createRoomStatus', 'Criando...');
+            try {
+                const roomId = await hashPassword(password);
+                const exists = await database.ref('rooms/' + roomId + '/info').once('value');
+                if (exists.exists()) {
+                    setStatus('createRoomStatus', 'Ja existe uma sala com esta senha. Escolha outra.', 'error');
+                    return;
+                }
+                await database.ref('rooms/' + roomId).set({
+                    meta: { key: adminKey },
+                    info: { name, created: firebase.database.ServerValue.TIMESTAMP }
+                });
+                await database.ref('admin_rooms/' + adminKey + '/' + roomId).set({
+                    name, password, created: firebase.database.ServerValue.TIMESTAMP
+                });
+                $('newRoomName').value = '';
+                $('newRoomPassword').value = '';
+                setStatus('createRoomStatus', 'Sala "' + name + '" criada.', 'ok');
+            } catch (error) {
+                setStatus('createRoomStatus', 'Nao foi possivel criar a sala. Verifique as regras do Firebase.', 'error');
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        async function deleteRoom(roomId, name) {
+            if (!confirm('Apagar a sala "' + name + '" e todas as mensagens?')) return;
+            const adminRoomRef = database.ref('admin_rooms/' + adminKey + '/' + roomId);
+            try {
+                await adminRoomRef.set('delete');
+                await database.ref('rooms/' + roomId).remove();
+                await adminRoomRef.remove();
+                setStatus('createRoomStatus', 'Sala "' + name + '" apagada.', 'ok');
+            } catch (error) {
+                setStatus('createRoomStatus', 'Nao foi possivel apagar a sala.', 'error');
+            }
+        }
+
+        async function copyText(text, button) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const original = button.textContent;
+                button.textContent = '✓';
+                setTimeout(() => { button.textContent = original; }, 1200);
+            } catch (error) {
+                prompt('Copie a senha:', text);
+            }
+        }
+
+        function renderRooms(rooms) {
+            const list = $('roomList');
+            list.textContent = '';
+            const entries = Object.entries(rooms)
+                .filter(([, room]) => room && typeof room === 'object')
+                .sort((a, b) => (b[1].created || 0) - (a[1].created || 0));
+            if (!entries.length) {
+                const empty = document.createElement('div');
+                empty.className = 'empty';
+                empty.textContent = 'Nenhuma sala criada ainda.';
+                list.appendChild(empty);
+                return;
+            }
+            for (const [roomId, room] of entries) {
+                const item = document.createElement('div');
+                item.className = 'room-item';
+
+                const info = document.createElement('div');
+                info.className = 'info';
+                const nameEl = document.createElement('div');
+                nameEl.className = 'name';
+                nameEl.textContent = room.name || 'Sala';
+                const passEl = document.createElement('div');
+                passEl.className = 'pass';
+                passEl.textContent = 'Senha: ';
+                const passValue = document.createElement('span');
+                passValue.textContent = revealed.has(roomId) ? room.password : '••••••';
+                passEl.appendChild(passValue);
+                const dateEl = document.createElement('div');
+                dateEl.className = 'date';
+                dateEl.textContent = room.created ? 'Criada em ' + new Date(room.created).toLocaleDateString('pt-BR') : '';
+                info.append(nameEl, passEl, dateEl);
+
+                const actions = document.createElement('div');
+                actions.className = 'room-actions';
+                const reveal = document.createElement('button');
+                reveal.className = 'mini';
+                reveal.title = 'Mostrar/ocultar senha';
+                reveal.textContent = revealed.has(roomId) ? '🙈' : '👁';
+                reveal.onclick = () => {
+                    if (revealed.has(roomId)) revealed.delete(roomId); else revealed.add(roomId);
+                    renderRooms(rooms);
+                };
+                const copy = document.createElement('button');
+                copy.className = 'mini';
+                copy.title = 'Copiar senha';
+                copy.textContent = '⧉';
+                copy.onclick = () => copyText(room.password, copy);
+                const del = document.createElement('button');
+                del.className = 'mini danger';
+                del.title = 'Apagar sala';
+                del.textContent = '🗑';
+                del.onclick = () => deleteRoom(roomId, room.name || 'Sala');
+                actions.append(reveal, copy, del);
+
+                item.append(info, actions);
+                list.appendChild(item);
+            }
+        }
+
+        renderDisplay();
         updateChatInputState();
     </script>
 </body>
